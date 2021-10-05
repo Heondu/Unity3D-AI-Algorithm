@@ -2,207 +2,209 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[System.Serializable]
-public class Node
+namespace AIAlgorithm.AStar
 {
-    public bool isWall;
-    public Node parentNode;
-
-    public int x, y, G, H;
-
-    public int F
+    public class Node
     {
-        get
+        public int x, y, G, H;
+        public Node parentNode;
+
+        public int F
         {
-            return G + H;
+            get { return G + H; }
+        }
+        public Vector2Int Pos
+        {
+            get { return new Vector2Int(x, y); }
+        }
+
+        public Node(int _x, int _y)
+        {
+            x = _x;
+            y = _y;
         }
     }
 
-    public Node(bool _isWall, int _x, int _y)
+    public class AStar : MonoBehaviour
     {
-        isWall = _isWall;
-        x = _x;
-        y = _y;
-    }
-}
+        [Header("Position")]
+        [SerializeField] private Vector2Int startPos;
+        [SerializeField] private Vector2Int endPos;
 
-public class AStar : MonoBehaviour
-{
-    public Vector2Int bottomLeft, topRight, startPos, targetPos;
-    public List<Node> FinalNodeList;
-    public bool allowDiagonal, dontCrossCorner;
+        [Header("Object")]
+        [SerializeField] private Transform moveObject;
 
-    int sizeX, sizeY;
+        [Header("Variable")]
+        [SerializeField] private float moveSpeed = 1;
 
-    Node[,] NodeArray;
+        private List<Node> openList, closedList, finalList;
 
-    Node StartNode, TargetNode, CurNode;
-
-    List<Node> OpenList, ClosedList;
-
-    public GameObject MoveObject;
-
-    bool isFind = false;
-
-    private void FixedUpdate()
-    {
-        Go();
-    }
-
-    IEnumerator MoveGameObject()
-    {
-        for (int i = 0; i < FinalNodeList.Count; i++)
+        private void Update()
         {
-            MoveObject.transform.position = new Vector3(FinalNodeList[i].x, 0, FinalNodeList[i].y);
-            yield return new WaitForSeconds(0.1f);
-        }
-    }
-
-    void Go()
-    {
-        if (isFind)
-        {
-            isFind = false;
-            StartCoroutine("MoveGameObject");
-        }
-    }
-
-    [ContextMenu("PathFinding")]
-    public void PathFinding()
-    {
-        isFind = true;
-
-        sizeX = topRight.x - bottomLeft.x + 1;
-        sizeY = topRight.y - bottomLeft.y + 1;
-
-        NodeArray = new Node[sizeX, sizeY];
-
-        for (int i = 0; i < sizeX; i++)
-        {
-            for (int j = 0; j < sizeY; j++)
+            if (Input.GetKeyDown(KeyCode.Space))
             {
-                bool isWall = false;
+                PathFinding();
+            }
+        }
 
-                foreach (Collider col in Physics.OverlapSphere(new Vector3(i + bottomLeft.x, 0, j + bottomLeft.y), 0.4f))
+        /// <summary>
+        /// 오브젝트의 이동처리를 하는 함수
+        /// </summary>
+        /// <returns></returns>
+        private IEnumerator Move()
+        {
+            moveObject.position = new Vector3(startPos.x, 0, startPos.y);
+
+            for (int i = 0; i < finalList.Count; i++)
+            {
+                float percent = 0;
+                float current = 0;
+
+                Vector3 originPos, targetPos;
+                originPos = moveObject.position;
+                targetPos = new Vector3(finalList[i].x, originPos.y, finalList[i].y);
+
+                while (current < 1)
                 {
-                    if (col.gameObject.layer == LayerMask.NameToLayer("Wall"))
+                    percent += Time.deltaTime;
+                    current = percent * moveSpeed;
+
+                    //부드럽게 이동하기 위해 Lerp함수를 이용한다.
+                    moveObject.position = Vector3.Lerp(originPos, targetPos, current);
+
+                    yield return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 길을 찾는 함수
+        /// </summary>
+        private void PathFinding()
+        {
+            openList = new List<Node>();
+            closedList = new List<Node>();
+            finalList = new List<Node>();
+
+            //열린 목록에 시작 노드 추가
+            openList.Add(new Node(startPos.x, startPos.y));
+
+            //열린 목록에 아무것도 없다면 길이 없음을 의미
+            while (openList.Count > 0)
+            {
+                Node currentNode = openList[0];
+                for (int i = 1; i < openList.Count; i++)
+                {
+                    //열린 목록 중에서 이동 비용이 가장 낮은 노드를 선택
+                    if ((openList[i].F <= currentNode.F) && openList[i].H < currentNode.H)
                     {
-                        isWall = true;
+                        currentNode = openList[i];
                     }
                 }
-                NodeArray[i, j] = new Node(isWall, i + bottomLeft.x, j + bottomLeft.y);
+                //선택한 노드를 열린 목록에서 지우고 닫힌 목록에 추가
+                openList.Remove(currentNode);
+                closedList.Add(currentNode);
+
+                if (currentNode.Pos == endPos)
+                {
+                    //선택한 노드가 목표 지점과 같다면 시작 지점이 될 때까지 부모 노드로 거슬러 올라감
+                    while (currentNode.Pos != startPos)
+                    {
+                        finalList.Add(currentNode);
+                        currentNode = currentNode.parentNode;
+                    }
+                    finalList.Add(new Node(startPos.x, startPos.y));
+                    //거꾸로 추가 되었기 때문에 Reverse함수로 뒤집어 줌
+                    finalList.Reverse();
+
+                    StartCoroutine("Move");
+                    return;
+                }
+
+                //인접한 노드 중 갈 수 있는 노드를 찾는 과정
+                AddNodeToOpenList(currentNode, new Node(currentNode.x + 1, currentNode.y));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x - 1, currentNode.y));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x, currentNode.y + 1));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x, currentNode.y - 1));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x + 1, currentNode.y + 1));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x - 1, currentNode.y + 1));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x + 1, currentNode.y - 1));
+                AddNodeToOpenList(currentNode, new Node(currentNode.x - 1, currentNode.y - 1));
             }
         }
 
-        StartNode = NodeArray[startPos.x - bottomLeft.x, startPos.y - bottomLeft.y];
-        TargetNode = NodeArray[targetPos.x - bottomLeft.x, targetPos.y - bottomLeft.y];
-
-        OpenList = new List<Node>();
-        ClosedList = new List<Node>();
-        FinalNodeList = new List<Node>();
-
-        OpenList.Add(StartNode);
-
-        while (OpenList.Count > 0)
+        /// <summary>
+        /// 노드 상태를 확인하고 열린 목록에 추가하는 함수
+        /// </summary>
+        /// <param name="currentNode">현재 노드</param>
+        /// <param name="newNode">인접 노드</param>
+        private void AddNodeToOpenList(Node currentNode, Node newNode)
         {
-            CurNode = OpenList[0];
-            for (int i = 1; i < OpenList.Count; i++)
+            //벽인지 검사
+            if (IsWall(newNode.x, newNode.y)) return;
+            //벽에 인접한 노드를 대각선으로 가로지르는지 검사
+            if (IsWall(currentNode.x, newNode.y) || IsWall(newNode.x, currentNode.y)) return;
+            //닫힌 목록에 이미 존재하는지 검사
+            if (closedList.Contains(newNode)) return;
+
+            int G;
+            //직선
+            if (currentNode.x - newNode.x == 0 || currentNode.y - newNode.y == 0)
             {
-                if ((OpenList[i].F <= CurNode.F) && (OpenList[i].H < CurNode.H))
-                {
-                    CurNode = OpenList[i];
-                }
+                G = currentNode.G + 10;
             }
-
-            OpenList.Remove(CurNode);
-            ClosedList.Add(CurNode);
-
-            if (CurNode == TargetNode)
-            {
-                Node TargetCurNode = TargetNode;
-
-                while (TargetCurNode != StartNode)
-                {
-                    FinalNodeList.Add(TargetCurNode);
-                    TargetCurNode = TargetCurNode.parentNode;
-                }
-
-                FinalNodeList.Add(StartNode);
-                FinalNodeList.Reverse();
-
-                for (int i = 0; i < FinalNodeList.Count; i++)
-                {
-                    Debug.Log($"{i} 번째는 {FinalNodeList[i].x}, {FinalNodeList[i].y}");
-                }
-
-                return;
-            }
-
-            if (allowDiagonal)
-            {
-                OpenListAdd(CurNode.x + 1, CurNode.y + 1);
-                OpenListAdd(CurNode.x - 1, CurNode.y + 1);
-                OpenListAdd(CurNode.x - 1, CurNode.y - 1);
-                OpenListAdd(CurNode.x + 1, CurNode.y - 1);
-            }
-
-            OpenListAdd(CurNode.x, CurNode.y + 1);
-            OpenListAdd(CurNode.x + 1, CurNode.y);
-            OpenListAdd(CurNode.x, CurNode.y - 1);
-            OpenListAdd(CurNode.x - 1, CurNode.y);
-        }
-    }
-
-    void OpenListAdd(int checkX, int checkY)
-    {
-        if ((checkX >= bottomLeft.x) && (checkX < topRight.x + 1) && (checkY >= bottomLeft.y) && (checkY < topRight.y + 1)
-            && (!NodeArray[checkX - bottomLeft.x, checkY - bottomLeft.y].isWall)
-            && (!ClosedList.Contains(NodeArray[checkX - bottomLeft.x, checkY - bottomLeft.y])))
-        {
-            if (allowDiagonal)
-            {
-                if ((NodeArray[CurNode.x - bottomLeft.x, checkY - bottomLeft.y].isWall)
-                    && (NodeArray[checkX - bottomLeft.x, CurNode.y - bottomLeft.y].isWall)) return;
-            }
-
-            if (dontCrossCorner)
-            {
-                if ((NodeArray[CurNode.x - bottomLeft.x, checkY - bottomLeft.y].isWall)
-                    || (NodeArray[checkX - bottomLeft.x, CurNode.y - bottomLeft.y].isWall)) return;
-            }
-
-            Node NeighborNode = NodeArray[checkX - bottomLeft.x, checkY - bottomLeft.y];
-
-            int MoveCost;
-
-            if (CurNode.x - checkX == 0 || CurNode.y - checkY == 0)
-            {
-                MoveCost = CurNode.G + 10;
-            }
+            //대각선
             else
             {
-                MoveCost = CurNode.G + 14;
+                G = currentNode.G + 14;
             }
 
-            if ((MoveCost < NeighborNode.G) || (!OpenList.Contains(NeighborNode)))
+            //이동 비용이 더 낫거나 열린 목록에 없다면 이동 비용을 계산하고 부모 노드를 현재 노드로 지정
+            if ((G < newNode.G) || (!openList.Contains(newNode)))
             {
-                NeighborNode.G = MoveCost;
+                newNode.G = G;
 
-                NeighborNode.H = (Mathf.Abs(NeighborNode.x - TargetNode.x) + Mathf.Abs(NeighborNode.y - TargetNode.y)) * 10;
-                NeighborNode.parentNode = CurNode;
+                newNode.H = (Mathf.Abs(newNode.x - endPos.x) + Mathf.Abs(newNode.y - endPos.y)) * 10;
+                newNode.parentNode = currentNode;
 
-                OpenList.Add(NeighborNode);
+                if (!openList.Contains(newNode))
+                {
+                    openList.Add(newNode);
+                }
             }
         }
-    }
 
-    private void OnDrawGizmos()
-    {
-        if (FinalNodeList.Count != 0)
+        /// <summary>
+        /// 해당 좌표에 벽이 있는지 검사하는 함수
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <returns></returns>
+        private bool IsWall(int x, int y)
         {
-            for (int i = 0; i < FinalNodeList.Count - 1; i++)
+            Collider[] colliders = Physics.OverlapSphere(new Vector3(x, 0, y), 0.4f, 1 << LayerMask.NameToLayer("Wall"));
+            if (colliders.Length > 0) return true;
+            else return false;
+        }
+
+        private void OnDrawGizmos()
+        {
+            Gizmos.color = Color.green;
+            for (int x = 0; x < 10; x++)
             {
-                Gizmos.DrawLine(new Vector2(FinalNodeList[i].x, FinalNodeList[i].y), new Vector2(FinalNodeList[i + 1].x, FinalNodeList[i + 1].y));
+                for (int z = 0; z < 10; z++)
+                {
+                    Gizmos.DrawWireCube(new Vector3(x, -0.9f, z), Vector3.one);
+                }
+            }
+
+            if (finalList != null)
+            {
+                Gizmos.color = Color.red;
+                for (int i = 0; i < finalList.Count - 1; i++)
+                {
+                    Gizmos.DrawWireCube(new Vector3(finalList[i].x, -0.9f, finalList[i].y), Vector3.one);
+                }
             }
         }
     }
