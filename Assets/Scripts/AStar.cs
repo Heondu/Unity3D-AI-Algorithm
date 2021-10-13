@@ -39,12 +39,22 @@ namespace AIAlgorithm.AStar
 
         private List<Node> openList, closedList, finalList;
 
-        private void Update()
+        //private void Update()
+        //{
+        //    if (Input.GetKeyDown(KeyCode.Space))
+        //    {
+        //        PathFinding();
+        //    }
+        //}
+
+        public void StartFinding(Vector3 destination)
         {
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                PathFinding();
-            }
+            StopCoroutine("Move");
+
+            startPos = new Vector2Int(Mathf.RoundToInt(transform.position.x), Mathf.RoundToInt(transform.position.y));
+            endPos = new Vector2Int(Mathf.RoundToInt(destination.x), Mathf.RoundToInt(destination.z));
+
+            PathFinding();
         }
 
         /// <summary>
@@ -53,7 +63,7 @@ namespace AIAlgorithm.AStar
         /// <returns></returns>
         private IEnumerator Move()
         {
-            moveObject.position = new Vector3(startPos.x, 0, startPos.y);
+            //transform.position = new Vector3(startPos.x, 0, startPos.y);
 
             for (int i = 0; i < finalList.Count; i++)
             {
@@ -61,7 +71,7 @@ namespace AIAlgorithm.AStar
                 float current = 0;
 
                 Vector3 originPos, targetPos;
-                originPos = moveObject.position;
+                originPos = transform.position;
                 targetPos = new Vector3(finalList[i].x, originPos.y, finalList[i].y);
 
                 while (current < 1)
@@ -70,7 +80,7 @@ namespace AIAlgorithm.AStar
                     current = percent * moveSpeed;
 
                     //부드럽게 이동하기 위해 Lerp함수를 이용한다.
-                    moveObject.position = Vector3.Lerp(originPos, targetPos, current);
+                    transform.position = Vector3.Lerp(originPos, targetPos, current);
 
                     yield return null;
                 }
@@ -187,25 +197,25 @@ namespace AIAlgorithm.AStar
             else return false;
         }
 
-        private void OnDrawGizmos()
-        {
-            Gizmos.color = Color.green;
-            for (int x = 0; x < 10; x++)
-            {
-                for (int z = 0; z < 10; z++)
-                {
-                    Gizmos.DrawWireCube(new Vector3(x, -0.9f, z), Vector3.one);
-                }
-            }
-
-            if (finalList != null)
-            {
-                Gizmos.color = Color.red;
-                for (int i = 0; i < finalList.Count - 1; i++)
-                {
-                    Gizmos.DrawWireCube(new Vector3(finalList[i].x, -0.9f, finalList[i].y), Vector3.one);
-                }
-            }
-        }
+        //private void OnDrawGizmos()
+        //{
+        //    Gizmos.color = Color.green;
+        //    for (int x = 0; x < 10; x++)
+        //    {
+        //        for (int z = 0; z < 10; z++)
+        //        {
+        //            Gizmos.DrawWireCube(new Vector3(x, -0.9f, z), Vector3.one);
+        //        }
+        //    }
+        //
+        //    if (finalList != null)
+        //    {
+        //        Gizmos.color = Color.red;
+        //        for (int i = 0; i < finalList.Count - 1; i++)
+        //        {
+        //            Gizmos.DrawWireCube(new Vector3(finalList[i].x, -0.9f, finalList[i].y), Vector3.one);
+        //        }
+        //    }
+        //}
     }
 }

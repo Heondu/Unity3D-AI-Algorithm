@@ -233,7 +233,7 @@ namespace AIAlgorithm.BT
             seqChase.AddChild(isPlayerInRange);
             seqChase.AddChild(chase);
 
-            //순찰 시퀀스에 액셕을 추가한다.
+            //순찰 시퀀스에 액션을 추가한다.
             seqPatrol.AddChild(patrol);
 
             StartCoroutine("Loop");
